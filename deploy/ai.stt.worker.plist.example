@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.stt.worker</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/uv</string>
+    <string>run</string>
+    <string>python</string>
+    <string>-m</string>
+    <string>stt_queue.worker</string>
+    <string>--warmup</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/YOUR_USERNAME/stt-service/app</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>STT_ROOT_DIR</key>
+    <string>/Users/YOUR_USERNAME/stt-service/runtime</string>
+    <key>STT_MODEL_PATH</key>
+    <string>/Users/YOUR_USERNAME/stt-models/whisper.cpp/ggml-large-v3-turbo-q5_0.bin</string>
+    <key>STT_MODEL</key>
+    <string>large-v3-turbo-q5_0</string>
+    <key>STT_WHISPER_BINARY</key>
+    <string>/opt/homebrew/bin/whisper-cli</string>
+    <key>STT_FFMPEG_BINARY</key>
+    <string>/opt/homebrew/bin/ffmpeg</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USERNAME/stt-service/runtime/logs/worker.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USERNAME/stt-service/runtime/logs/worker.err.log</string>
+</dict>
+</plist>
