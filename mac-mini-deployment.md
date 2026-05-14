@@ -1,85 +1,136 @@
-# Mac Mini Deployment Notes
+# macOS Deployment (Mac Mini + launchd)
 
-## Runtime 原則
+> 繁體中文版：[mac-mini-deployment.zh.md](mac-mini-deployment.zh.md)
 
-遵守目前環境管理規則：
+This guide covers deploying the STT queue service on macOS with launchd for process supervision. The service runs on any Mac with Homebrew and Python 3.12+, but the instructions here are optimized for a Mac Mini used as a local AI gateway.
 
-- 系統工具用 Homebrew。
-- Python package 用 `uv`，不污染 system Python。
-- 不用 `nvm` / `pyenv` / `asdf` / curl installer。
-- 不改 `~/.zshrc` 或 `~/.profile`。
+## Runtime Principles
 
-## whisper.cpp baseline
+- System tools via Homebrew.
+- Python packages via `uv` — do not pollute system Python.
+- Do not use `nvm` / `pyenv` / `asdf` / curl installers.
+- Do not modify `~/.zshrc` or `~/.profile`.
+
+## Install Dependencies
 
 ```bash
-brew install whisper-cpp ffmpeg
+brew install whisper-cpp ffmpeg uv
 ```
 
-模型檔不放 repo。建議放：
+## Download a Model
+
+Model files are not included in the repo. Recommended path:
 
 ```text
-/Users/dbuadmin/stt-models/whisper.cpp/
+~/stt-models/whisper.cpp/
 ```
 
-Production 預設模型：
+Production default:
 
 ```text
 ggml-large-v3-turbo-q5_0.bin
 ```
 
-Fallback 模型：
+Fallback:
 
 ```text
 ggml-small.bin
 ```
 
-## Service 位置
+Download:
 
-建議在 Mac Mini 建獨立 service root：
-
-```text
-/Users/dbuadmin/stt-service/
+```bash
+mkdir -p ~/stt-models/whisper.cpp
+curl -L -o ~/stt-models/whisper.cpp/ggml-large-v3-turbo-q5_0.bin \
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
 ```
 
-不要塞進 `~/.openclaw`。OpenClaw 只呼叫 STT API，不直接管理 STT queue internals。
+## Service Root
+
+Create an isolated service root:
+
+```text
+~/stt-service/
+```
+
+Keep this separate from other application directories.
+
+## Bootstrap
+
+The `deploy/bootstrap-mac-mini.sh` script stages the service code and downloads the model:
+
+```bash
+cd deploy
+bash bootstrap-mac-mini.sh
+```
+
+Customize with environment variables:
+
+```bash
+STT_SERVICE_HOME=~/stt-service \
+STT_MODEL_DIR=~/stt-models/whisper.cpp \
+STT_MODEL_NAME=large-v3-turbo-q5_0 \
+bash bootstrap-mac-mini.sh
+```
 
 ## Port
 
-建議只綁 loopback：
+Bind to loopback only:
 
 ```text
 127.0.0.1:8787
 ```
 
-如果要讓 Nginx 暴露，只暴露內部 route，並加 token。
+If exposed via Nginx, only expose the `/stt/` route and require a bearer token:
 
 ```text
 /stt/ -> 127.0.0.1:8787
 ```
 
-## launchd
+See `deploy/nginx-stt-location.conf` for a sample Nginx config.
 
-建議拆兩個 LaunchAgent：
+## launchd (Process Supervision)
+
+Split into two LaunchAgents — API and worker are separate so the worker can be restarted or swapped without disrupting the ingress:
 
 ```text
-ai.stt.api.plist
-ai.stt.worker.plist
+ai.stt.api.plist    — FastAPI server
+ai.stt.worker.plist — transcription worker
 ```
 
-API 與 worker 拆開的原因：API 要穩定接 job，worker 可以單獨 restart / 換 engine / 跑 benchmark。
+Copy and customize the examples:
 
-## Worker profiles
+```bash
+cp deploy/ai.stt.api.plist.example ~/Library/LaunchAgents/ai.stt.api.plist
+cp deploy/ai.stt.worker.plist.example ~/Library/LaunchAgents/ai.stt.worker.plist
+# Edit both files: replace YOUR_USERNAME and adjust paths
+```
+
+Load:
+
+```bash
+launchctl load ~/Library/LaunchAgents/ai.stt.api.plist
+launchctl load ~/Library/LaunchAgents/ai.stt.worker.plist
+```
+
+Verify:
+
+```bash
+bash deploy/verify-mac-mini.sh
+```
+
+## Worker Profiles
 
 Production:
 
 ```text
 STT_ENGINE=whisper.cpp
 STT_MODEL=large-v3-turbo-q5_0
-STT_MODEL_PATH=/Users/dbuadmin/stt-models/whisper.cpp/ggml-large-v3-turbo-q5_0.bin
+STT_MODEL_PATH=~/stt-models/whisper.cpp/ggml-large-v3-turbo-q5_0.bin
 STT_CONCURRENCY=1
 ```
 
-A/B:
+A/B (Apple Silicon MLX):
 
 ```text
 STT_ENGINE=mlx-whisper
@@ -95,20 +146,20 @@ STT_MODEL=distil-medium.en
 STT_CONCURRENCY=1
 ```
 
-## OpenClaw / n8n 整合
+## Downstream Integration
 
-OpenClaw 或 n8n 不直接等 STT 長任務完成。建議模式：
+Do not block on long STT jobs. Recommended pattern:
 
 ```text
-submit audio -> receive job id -> poll/callback -> continue text workflow
+submit audio -> receive job id -> poll / callback -> continue text workflow
 ```
 
-短語音可同步等最多 30 秒；超過就回「已收到，轉錄中」類狀態，避免 webhook timeout。
+Short audio (< 30 s) can be polled synchronously; longer audio should return a pending status immediately to avoid webhook timeouts.
 
-## 安全性
+## Security
 
-- STT API 預設 loopback only。
-- 若經 Nginx 暴露，需要 bearer token。
-- 原始音檔設 TTL cleanup。
-- log 不記完整 transcript，避免敏感資料外洩。
-- failed job 保留音檔以利 debug，但最多 7 天。
+- STT API defaults to loopback only.
+- If exposed via Nginx, require a bearer token (`STT_API_TOKEN`).
+- Raw audio is deleted after TTL.
+- Logs do not record full transcript content to avoid sensitive data exposure.
+- Failed job audio is retained for up to 7 days for debugging.

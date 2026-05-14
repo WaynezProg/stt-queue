@@ -165,23 +165,25 @@ cd deploy
 bash bootstrap-mac-mini.sh
 ```
 
-## Shell scripts (OpenClaw / agent use)
+## Shell scripts (agent / automation use)
 
-The `openclaw-skill/stt-queue/scripts/` directory contains shell scripts for submitting, polling, and retrying jobs from an AI agent or automation context. Set `STT_BASE_URL` and optionally `STT_API_TOKEN` to configure the endpoint.
+`agent-skill/stt-queue/scripts/` contains shell scripts for submitting, polling, and retrying jobs from an AI agent or automation context. Set `STT_BASE_URL` and optionally `STT_API_TOKEN` to configure the endpoint.
 
 ```bash
 # health check
-./openclaw-skill/stt-queue/scripts/health.sh
+./agent-skill/stt-queue/scripts/health.sh
 
 # submit
-./openclaw-skill/stt-queue/scripts/submit_audio.sh /path/to/audio.m4a --source line --language zh
+./agent-skill/stt-queue/scripts/submit_audio.sh /path/to/audio.m4a --source agent --language zh
 
 # poll
-./openclaw-skill/stt-queue/scripts/poll_job.sh stt_...
+./agent-skill/stt-queue/scripts/poll_job.sh stt_...
 
 # retry failed
-./openclaw-skill/stt-queue/scripts/retry_job.sh stt_...
+./agent-skill/stt-queue/scripts/retry_job.sh stt_...
 ```
+
+The `agent-skill/stt-queue/SKILL.md` file is a ready-to-use playbook for AI agent frameworks (Claude Code, OpenClaw, n8n, or any tool that supports skill/prompt files).
 
 ## Configuration
 
@@ -199,11 +201,15 @@ Key variables:
 
 ## Docs
 
-- [architecture.md](architecture.md) — system design and data flow
-- [queue-contract.md](queue-contract.md) — queue schema, state machine, API contract
-- [mac-mini-deployment.md](mac-mini-deployment.md) — production deployment guide
-- [benchmark-plan.md](benchmark-plan.md) — model comparison methodology
-- [service/README.md](service/README.md) — service development reference
+English and Traditional Chinese versions are provided for each doc.
+
+| Doc | English | 繁體中文 |
+|---|---|---|
+| Architecture | [architecture.md](architecture.md) | [architecture.zh.md](architecture.zh.md) |
+| Queue contract | [queue-contract.md](queue-contract.md) | [queue-contract.zh.md](queue-contract.zh.md) |
+| macOS deployment | [mac-mini-deployment.md](mac-mini-deployment.md) | [mac-mini-deployment.zh.md](mac-mini-deployment.zh.md) |
+| Benchmark plan | [benchmark-plan.md](benchmark-plan.md) | [benchmark-plan.zh.md](benchmark-plan.zh.md) |
+| Service dev guide | [service/README.md](service/README.md) | — |
 
 ## License
 

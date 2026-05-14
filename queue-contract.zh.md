@@ -1,8 +1,6 @@
 # STT Queue Contract
 
-> 繁體中文版：[queue-contract.zh.md](queue-contract.zh.md)
-
-## Directory Layout
+## 目錄建議
 
 ```text
 stt-service/
@@ -17,7 +15,7 @@ stt-service/
   logs/
 ```
 
-## Job States
+## Job 狀態
 
 ```text
 queued -> processing -> done
@@ -26,9 +24,9 @@ queued -> canceled
 failed -> queued
 ```
 
-`failed -> queued` transition is only allowed when retry count is below the limit.
+`failed -> queued` 只允許 retry 次數未超過上限。
 
-## SQLite Schema
+## SQLite schema
 
 ```sql
 CREATE TABLE stt_jobs (
@@ -61,9 +59,9 @@ CREATE INDEX idx_stt_jobs_claim
   ON stt_jobs(status, priority, created_at);
 ```
 
-## Atomic Claim
+## Atomic claim
 
-Workers must claim jobs inside a transaction to prevent multiple workers from picking the same job.
+Worker claim job 時必須用 transaction，避免多 worker 搶同一筆。
 
 ```sql
 BEGIN IMMEDIATE;
@@ -95,12 +93,12 @@ Content-Type: multipart/form-data
 Fields:
 
 ```text
-audio:         required file
-source:        api | webhook | agent | manual
-language:      optional
-model:         optional
-priority:      optional (lower = higher priority, default 100)
-callback_url:  optional
+audio: required file
+source: api | webhook | agent | manual
+language: optional
+model: optional
+priority: optional
+callback_url: optional
 metadata_json: optional
 ```
 
@@ -128,13 +126,7 @@ Response:
   "text": "transcript here",
   "duration_sec": 18.2,
   "engine": "whisper.cpp",
-  "model": "large-v3-turbo-q5_0",
-  "metrics": {
-    "queue_latency_sec": 0.05,
-    "normalize_sec": 0.2,
-    "transcribe_sec": 1.5,
-    "processing_sec": 1.8
-  }
+  "model": "small"
 }
 ```
 
@@ -144,21 +136,21 @@ Response:
 POST /stt/jobs/{id}/retry
 ```
 
-Only allowed for `failed` jobs.
+只允許 `failed` job。
 
-## Worker Timeout
+## Worker timeout
 
-| Audio length | Timeout |
+| 音檔長度 | timeout |
 |---|---:|
-| <= 60 s | 120 s |
-| <= 10 min | 20 min |
-| > 10 min | background only — do not block synchronously |
+| <= 60 秒 | 120 秒 |
+| <= 10 分鐘 | 20 分鐘 |
+| > 10 分鐘 | background-only，禁止同步等待 |
 
 ## Retention
 
-| Data | Recommended retention |
+| 資料 | 建議保留 |
 |---|---:|
-| Raw audio | 24 hours |
-| Normalized wav | 24 hours |
-| Transcript txt/json | 30 days |
-| Failed job audio | 7 days |
+| 原始音檔 | 24 小時 |
+| normalized wav | 24 小時 |
+| transcript txt/json | 30 天 |
+| failed audio | 7 天 |

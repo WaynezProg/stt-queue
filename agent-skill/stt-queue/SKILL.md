@@ -1,11 +1,11 @@
 ---
 name: stt-queue
-description: Use when OpenClaw needs to transcribe local audio files, LINE voice messages, meeting recordings, or other speech inputs through the Mac Mini STT queue service.
+description: Use when an AI agent needs to transcribe audio files through the local STT queue service. Covers voice messages, meeting recordings, and any speech input that must be converted to text before continuing a workflow.
 ---
 
 # STT Queue
 
-Use this skill when an audio file must be transcribed before continuing an OpenClaw workflow.
+Use this skill when an audio file must be transcribed before continuing a workflow.
 
 ## Contract
 
@@ -13,22 +13,21 @@ Use this skill when an audio file must be transcribed before continuing an OpenC
 - Production engine: `whisper.cpp`
 - Production model: `large-v3-turbo-q5_0`
 - Queue mode: async SQLite job queue
-- Worker mode: one worker processes one job at a time; launchd worker runs warmup on start.
+- Worker mode: one worker processes one job at a time; worker runs warmup on start.
 - Long audio must be submitted as a job and polled; do not block webhook flows waiting for long transcription.
 
 ## When To Use
 
-- LINE voice message needs transcription.
-- User provides a local audio file path.
-- n8n/OpenClaw workflow needs speech converted to text before LLM reasoning.
-- Meeting or call audio should be queued rather than sent to Spark as raw audio.
+- A voice message or audio clip needs transcription.
+- A workflow receives an audio file and needs the text before reasoning.
+- A meeting or call recording should be queued rather than processed synchronously.
 
 ## Do Not
 
-- Do not send raw audio to Spark unless explicitly requested for a separate experiment.
-- Do not use Qwen, SenseVoice, FunASR, or other China-mainland ASR models.
+- Do not use Qwen-ASR, SenseVoice, FunASR, or other mainland China ASR models.
 - Do not claim transcription quality is final without checking the returned text.
 - Do not expose `/stt/` publicly without bearer token protection.
+- Do not block a webhook response waiting for long audio — submit and poll.
 
 ## Quick Commands
 
@@ -43,7 +42,7 @@ scripts/health.sh
 Submit audio:
 
 ```bash
-scripts/submit_audio.sh /path/to/audio.m4a --source line --language zh
+scripts/submit_audio.sh /path/to/audio.m4a --source agent --language zh
 ```
 
 Poll:
@@ -99,4 +98,4 @@ Expected poll result:
 }
 ```
 
-For LINE or webhook flows, if the job is still `queued` or `processing`, answer with a short pending message and continue by job id later.
+If the job is still `queued` or `processing`, respond with a short pending acknowledgement and continue by job id later.

@@ -1,61 +1,63 @@
 # STT Benchmark Plan
 
-## 目的
+> 繁體中文版：[benchmark-plan.zh.md](benchmark-plan.zh.md)
 
-不要憑工具宣稱決策。用 Mac Mini 真實 workload 比較 `whisper.cpp`、`mlx-whisper`、`lightning-whisper-mlx`。
+## Purpose
 
-## 候選
+Don't make engine decisions based on vendor claims. Compare `whisper.cpp`, `mlx-whisper`, and `lightning-whisper-mlx` against real workloads before changing the production default.
 
-| Engine | 定位 | 是否 production 預設 |
+## Candidates
+
+| Engine | Role | Production default |
 |---|---|---|
-| whisper.cpp | 穩定 baseline | 是 |
-| mlx-whisper | Apple Silicon 原生 A/B | 否 |
-| lightning-whisper-mlx | 速度實驗 | 否 |
+| whisper.cpp | Stable baseline | Yes |
+| mlx-whisper | Apple Silicon native A/B | No |
+| lightning-whisper-mlx | Speed experiment | No |
 
-## 測試資料
+## Test Data
 
-至少準備三類：
-
-```text
-short-command: 5-20 秒，LINE/語音指令
-normal-message: 30-90 秒，日常留言
-long-audio: 5-20 分鐘，會議或長語音
-```
-
-每類至少 10 筆，包含：
+Prepare at least three categories:
 
 ```text
-中文
-英文
-中英混雜
-背景噪音
-手機壓縮音訊
+short-command:  5–20 s  — voice commands, short messages
+normal-message: 30–90 s — everyday voice messages
+long-audio:     5–20 min — meetings or extended recordings
 ```
 
-## 指標
+At least 10 samples per category, covering:
 
-| 指標 | 說明 |
+```text
+Mandarin Chinese
+English
+Code-switching (mixed)
+Background noise
+Mobile-compressed audio
+```
+
+## Metrics
+
+| Metric | Description |
 |---|---|
-| RTF | real-time factor，越低越好。 |
-| p50 latency | 一般體感。 |
-| p95 latency | queue 積壓時的尾端延遲。 |
-| failure rate | decode / timeout / hallucination。 |
-| manual quality score | 人工抽樣 1-5 分。 |
-| memory pressure | 是否影響 OpenClaw / n8n。 |
+| RTF | Real-time factor — lower is better. |
+| p50 latency | Typical perceived latency. |
+| p95 latency | Tail latency under queue backpressure. |
+| failure rate | Decode errors / timeouts / hallucinations. |
+| manual quality score | Human-sampled 1–5 rating. |
+| memory pressure | Impact on other local services. |
 
-## 通過門檻
+## Pass Criteria
 
-正式預設 engine 必須同時滿足：
+A candidate engine must satisfy all of the following to become the production default:
 
 ```text
-p95 short-command < 10 秒
-p95 normal-message < 45 秒
-long-audio 不 timeout
+p95 short-command  < 10 s
+p95 normal-message < 45 s
+long-audio does not timeout
 failure rate < 2%
-不造成 OpenClaw gateway 明顯延遲
+does not cause noticeable latency for other local services
 ```
 
-## 測試順序
+## Test Order
 
 1. `whisper.cpp small`
 2. `whisper.cpp medium`
@@ -63,9 +65,9 @@ failure rate < 2%
 4. `mlx-whisper distil-whisper`
 5. `lightning-whisper-mlx distil-medium.en`
 
-如果 `small` 中文品質不足，直接升 `medium`，不要用更複雜 queue 設計掩蓋模型品質問題。
+If `small` produces insufficient quality for the target language, upgrade to `medium` directly. Do not mask model quality issues with queue-side complexity.
 
-## 報告格式
+## Report Format
 
 ```text
 engine:

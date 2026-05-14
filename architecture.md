@@ -1,56 +1,58 @@
 # STT Queue Architecture
 
-## 目標
+> 繁體中文版：[architecture.zh.md](architecture.zh.md)
 
-降低音檔搬運成本。音檔只傳到 Mac Mini 一次，後續在 Mac Mini 本機完成 decode、normalize、STT、transcript storage，再把文字交給 OpenClaw 或 n8n。
+## Goal
 
-## 拓撲
+Minimize audio transfer cost. Audio is uploaded to the local machine once; decode, normalize, STT, and transcript storage all happen locally. Only the resulting text is handed off to downstream workflows.
+
+## Topology
 
 ```text
-LINE / client
-  -> Mac Mini ingress
+Client
+  -> Local ingress
       -> audio file on disk
       -> SQLite stt_jobs
       -> STT worker
           -> whisper.cpp
           -> transcript JSON / TXT
-      -> OpenClaw / n8n / Spark text workflow
+      -> downstream text workflow
 ```
 
-## 元件
+## Components
 
-| 元件 | 建議 | 說明 |
+| Component | Choice | Notes |
 |---|---|---|
-| Ingress API | FastAPI / small Node service | 接收音檔、建立 job、回 job id。 |
-| Queue DB | SQLite WAL | Mac Mini 單機 queue 足夠，不先引入 Redis。 |
-| Audio store | local filesystem | 音檔不進 DB，只存 path 與 checksum。 |
-| Worker | single process | 初始 concurrency `1`，後續再壓測 `2`。 |
-| STT engine | whisper.cpp | production baseline。 |
-| Optional engine | mlx-whisper / lightning-whisper-mlx | 只透過同一 worker interface A/B。 |
+| Ingress API | FastAPI | Receives audio, creates job, returns job id. |
+| Queue DB | SQLite WAL | Single-machine queue; no Redis needed initially. |
+| Audio store | local filesystem | Audio is not stored in DB — only path and checksum. |
+| Worker | single process | Concurrency `1` initially; benchmark before raising. |
+| STT engine | whisper.cpp | Production baseline. |
+| Optional engine | mlx-whisper / lightning-whisper-mlx | A/B via the same worker interface. |
 
-## 資料流
+## Data Flow
 
-1. Ingress 收到音檔，寫入 `data/incoming/{job_id}/original.*`。
-2. 用 `ffmpeg` normalize 成 `16kHz mono wav`，寫入 `data/processing/{job_id}/input.wav`。
-3. 建立 `stt_jobs` row，狀態為 `queued`。
-4. Worker 用 atomic claim 把 job 改為 `processing`。
-5. Worker 呼叫 STT engine 產生 transcript。
-6. 結果寫入 `data/transcripts/{job_id}.json` 與 `.txt`。
-7. Job 改為 `done`，再通知 OpenClaw / n8n。
-8. 原始音檔依 TTL 清除，transcript 保留較久。
+1. Ingress receives audio, writes to `data/incoming/{job_id}/original.*`.
+2. ffmpeg normalizes to `16kHz mono wav`, writes to `data/processing/{job_id}/input.wav`.
+3. Creates a `stt_jobs` row with status `queued`.
+4. Worker atomically claims the job, sets status to `processing`.
+5. Worker calls the STT engine, generates transcript.
+6. Result written to `data/transcripts/{job_id}.json` and `.txt`.
+7. Job status set to `done`; if `callback_url` is set, downstream is notified.
+8. Raw audio deleted after TTL; transcripts retained longer.
 
-## 為什麼不用 Spark 跑 STT
+## Why run STT locally
 
-音檔傳到 Spark 會多一段 LAN 搬運，也會把 Spark GPU 資源拿去做不必要的前處理。這個架構下，Mac Mini 已經是入口與 OpenClaw host；STT 在入口機本地完成是比較乾淨的邊界。
+Cross-machine audio transfer adds network cost and ties up remote resources (e.g. a GPU server) with preprocessing work that doesn't need a GPU. Audio is large; text is small. Completing STT at the ingress machine is a cleaner boundary.
 
-## 模型策略
+## Model Strategy
 
-production 初始：
+Production default:
 
 ```text
 engine: whisper.cpp
 model: large-v3-turbo-q5_0
-language: auto 或 zh/en 指定
+language: auto or zh/en
 timestamps: segment-level
 ```
 
@@ -60,18 +62,17 @@ Fallback:
 model: small
 ```
 
-速度 A/B：
+Speed A/B candidates:
 
 ```text
 engine: mlx-whisper
-model: mlx-community/whisper-small 或 distil-whisper
+model: mlx-community/whisper-small or distil-whisper
 ```
 
-不納入：
+Excluded (policy):
 
 ```text
 Qwen-ASR
 SenseVoice
 FunASR
-其他中國 / 大陸模型
 ```
