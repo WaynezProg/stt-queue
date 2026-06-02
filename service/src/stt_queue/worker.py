@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import shutil
 import time
 from typing import Callable
 import wave
@@ -14,6 +16,29 @@ from stt_queue.engine import WhisperCppEngine
 
 
 NormalizeFunc = Callable[[str, Path, Path], None]
+
+
+def _copy_to_n8n_data(text_path: Path, json_path: Path, metadata_json: str | None) -> None:
+    """Copy transcript to shared n8n-data directory for file-based detection."""
+    if not metadata_json:
+        return
+    try:
+        meta = json.loads(metadata_json)
+    except Exception:
+        return
+    project_id = meta.get("projectId")
+    if not project_id:
+        return
+
+    n8n_root = Path(os.environ.get("N8N_DATA_ROOT", str(Path.home() / "n8n-data"))).expanduser()
+    whisper_dir = n8n_root / project_id / "whisper"
+    try:
+        whisper_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(text_path, whisper_dir / "transcript.txt")
+        shutil.copy2(json_path, whisper_dir / "transcript.json")
+        print(f"[STT] Copied transcript to {whisper_dir}", flush=True)
+    except Exception as exc:
+        print(f"[STT] Failed to copy to n8n-data: {exc}", flush=True)
 
 
 def _elapsed(start: float) -> float:
@@ -83,6 +108,8 @@ def process_one(
             processing_sec=_elapsed(processing_started),
             queue_latency_sec=job.queue_latency_sec,
         )
+        # Copy transcript to shared n8n-data for file-based pipeline detection
+        _copy_to_n8n_data(text_path, json_path, job.metadata_json)
     except Exception as exc:
         db.mark_failed(job.id, "worker_error", str(exc))
     return True
