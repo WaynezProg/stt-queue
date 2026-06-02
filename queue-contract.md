@@ -104,6 +104,24 @@ callback_url:  optional
 metadata_json: optional
 ```
 
+Meeting Pipeline multi-audio jobs should send project/file metadata in `metadata_json`:
+
+```json
+{
+  "projectId": "project-id",
+  "fileId": "audio-file-id",
+  "storedFilename": "stored-name.m4a",
+  "originalName": "防詐會議1.m4a",
+  "audioIndex": 0,
+  "audioCount": 3
+}
+```
+
+When `projectId` and `fileId` are present, the worker copies completed transcripts to
+`$N8N_DATA_ROOT/<projectId>/whisper/transcript-<fileId>.txt` and
+`$N8N_DATA_ROOT/<projectId>/whisper/transcript-<fileId>.json`. For single-audio jobs
+or jobs without `fileId`, the legacy `transcript.txt` / `transcript.json` outputs remain supported.
+
 Response:
 
 ```json

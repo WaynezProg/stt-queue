@@ -102,6 +102,24 @@ callback_url: optional
 metadata_json: optional
 ```
 
+Meeting Pipeline 多音檔工作應在 `metadata_json` 傳入專案與檔案資訊：
+
+```json
+{
+  "projectId": "project-id",
+  "fileId": "audio-file-id",
+  "storedFilename": "stored-name.m4a",
+  "originalName": "防詐會議1.m4a",
+  "audioIndex": 0,
+  "audioCount": 3
+}
+```
+
+當 `projectId` 與 `fileId` 存在時，worker 會把完成的逐字稿複製到
+`$N8N_DATA_ROOT/<projectId>/whisper/transcript-<fileId>.txt` 與
+`$N8N_DATA_ROOT/<projectId>/whisper/transcript-<fileId>.json`。單一音檔工作或沒有
+`fileId` 的工作仍支援舊版 `transcript.txt` / `transcript.json` 輸出。
+
 Response:
 
 ```json

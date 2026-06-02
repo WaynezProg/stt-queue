@@ -77,6 +77,25 @@ STT_API_TOKEN=<bearer-token-if-enabled>
 
 If `STT_API_TOKEN` is set, scripts send `Authorization: Bearer <token>`.
 
+## Meeting Pipeline Metadata
+
+For Meeting Pipeline multi-audio jobs, submit each audio as a separate job and include:
+
+```json
+{
+  "projectId": "project-id",
+  "fileId": "audio-file-id",
+  "storedFilename": "stored-name.m4a",
+  "originalName": "meeting-1.m4a",
+  "audioIndex": 0,
+  "audioCount": 3
+}
+```
+
+When `projectId` and `fileId` are present, the worker writes per-file outputs under
+`$N8N_DATA_ROOT/<projectId>/whisper/transcript-<fileId>.txt` and `.json`. Single-audio
+jobs still support legacy `transcript.txt` / `transcript.json`.
+
 ## Result Handling
 
 Expected poll result:

@@ -111,9 +111,27 @@ Submit an audio file for transcription.
 | `model` | string | no | Override default model name |
 | `priority` | int | no | Lower = higher priority (default: 100) |
 | `callback_url` | string | no | Webhook URL to POST result when done |
-| `metadata_json` | string | no | Arbitrary JSON stored with the job |
+| `metadata_json` | string | no | Arbitrary JSON stored with the job. Meeting Pipeline may include project/file metadata for n8n output routing. |
 
 Returns `{"id": "stt_...", "status": "queued"}`.
+
+Meeting Pipeline multi-audio jobs should include this `metadata_json` shape:
+
+```json
+{
+  "projectId": "project-id",
+  "fileId": "audio-file-id",
+  "storedFilename": "stored-name.m4a",
+  "originalName": "防詐會議1.m4a",
+  "audioIndex": 0,
+  "audioCount": 3
+}
+```
+
+When `projectId` and `fileId` are present, the worker copies completed transcripts to
+`$N8N_DATA_ROOT/<projectId>/whisper/transcript-<fileId>.txt` and
+`$N8N_DATA_ROOT/<projectId>/whisper/transcript-<fileId>.json`. For single-audio jobs
+or jobs without `fileId`, the legacy `transcript.txt` / `transcript.json` outputs remain supported.
 
 ### `GET /stt/jobs/{id}`
 

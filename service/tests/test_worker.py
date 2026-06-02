@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import time
 
 from stt_queue.db import Database
@@ -43,6 +44,47 @@ def test_process_one_normalizes_and_marks_done(tmp_path: Path):
     assert job.transcribe_sec is not None
     assert job.processing_sec is not None
     assert job.queue_latency_sec is not None
+
+
+def test_process_one_copies_transcript_to_per_file_n8n_path(tmp_path: Path, monkeypatch):
+    audio = tmp_path / "input.m4a"
+    audio.write_bytes(b"fake")
+    n8n_root = tmp_path / "n8n-data"
+    monkeypatch.setenv("N8N_DATA_ROOT", str(n8n_root))
+
+    db = Database(tmp_path / "jobs.sqlite")
+    db.init()
+    db.create_job(
+        "job_1",
+        "feib-meeting-pipeline",
+        str(audio),
+        "whisper.cpp",
+        "small",
+        100,
+        "zh",
+        2,
+        metadata_json=json.dumps({
+            "projectId": "project-1",
+            "fileId": "audio-one",
+            "storedFilename": "stored-1.m4a",
+            "originalName": "防詐會議1.m4a",
+            "audioIndex": 0,
+            "audioCount": 2,
+        }),
+    )
+
+    assert process_one(
+        db=db,
+        engine=FakeEngine(),
+        processing_dir=tmp_path / "processing",
+        transcripts_dir=tmp_path / "transcripts",
+        normalize_func=fake_normalize,
+    ) is True
+
+    whisper_dir = n8n_root / "project-1" / "whisper"
+    assert (whisper_dir / "transcript-audio-one.txt").read_text(encoding="utf-8") == "hello"
+    assert (whisper_dir / "transcript-audio-one.json").read_text(encoding="utf-8") == '{"text":"hello"}'
+    assert not (whisper_dir / "transcript.txt").exists()
 
 
 def test_warmup_engine_creates_silence_and_runs_engine(tmp_path: Path):

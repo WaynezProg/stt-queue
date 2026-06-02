@@ -8,6 +8,7 @@ import shutil
 import time
 from typing import Callable
 import wave
+import re
 
 from stt_queue.audio import normalize_audio, wav_duration_sec
 from stt_queue.config import Settings
@@ -16,6 +17,13 @@ from stt_queue.engine import WhisperCppEngine
 
 
 NormalizeFunc = Callable[[str, Path, Path], None]
+
+
+def _safe_output_name(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip())
+    return safe[:120] or None
 
 
 def _copy_to_n8n_data(text_path: Path, json_path: Path, metadata_json: str | None) -> None:
@@ -34,8 +42,18 @@ def _copy_to_n8n_data(text_path: Path, json_path: Path, metadata_json: str | Non
     whisper_dir = n8n_root / project_id / "whisper"
     try:
         whisper_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(text_path, whisper_dir / "transcript.txt")
-        shutil.copy2(json_path, whisper_dir / "transcript.json")
+        file_id = _safe_output_name(meta.get("fileId"))
+        audio_count = meta.get("audioCount")
+        if file_id:
+            output_stem = f"transcript-{file_id}"
+            shutil.copy2(text_path, whisper_dir / f"{output_stem}.txt")
+            shutil.copy2(json_path, whisper_dir / f"{output_stem}.json")
+            if audio_count in (None, 1, "1"):
+                shutil.copy2(text_path, whisper_dir / "transcript.txt")
+                shutil.copy2(json_path, whisper_dir / "transcript.json")
+        else:
+            shutil.copy2(text_path, whisper_dir / "transcript.txt")
+            shutil.copy2(json_path, whisper_dir / "transcript.json")
         print(f"[STT] Copied transcript to {whisper_dir}", flush=True)
     except Exception as exc:
         print(f"[STT] Failed to copy to n8n-data: {exc}", flush=True)
